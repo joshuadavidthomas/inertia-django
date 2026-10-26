@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Prepares a fresh Amp orb: Python deps (uv), v3 compatibility frontend (npm +
+# Playwright Chromium), and docs (npm). Must stay idempotent and fast when warm.
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+step() {
+  local label="$1"
+  shift
+  echo "==> $label"
+  local start=$SECONDS
+  "$@"
+  echo "    done in $((SECONDS - start))s"
+}
+
+playwright_install() {
+  local dir=inertia/tests/v3_frontend
+  # Playwright 1.50's browser extraction hangs under the orb's Node 26, so run
+  # its CLI under Node 20 (the version CI uses).
+  playwright() {
+    (cd "$dir" && npx -y -p node@20 -- node node_modules/playwright/cli.js "$@")
+  }
+  # install-deps always runs apt-get update; only do it the first time.
+  if ! compgen -G "$HOME/.cache/ms-playwright/chromium-*" >/dev/null; then
+    playwright install-deps chromium
+  fi
+  playwright install chromium
+}
+
+step "uv sync" uv sync --locked --extra ssr
+step "npm ci (v3 frontend)" npm ci --prefix inertia/tests/v3_frontend --no-audit --no-fund
+step "playwright chromium" playwright_install
+step "npm ci (docs)" npm ci --prefix docs --no-audit --no-fund

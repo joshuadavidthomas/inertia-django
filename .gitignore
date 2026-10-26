@@ -167,3 +167,6 @@ poetry.lock
 
 .DS_Store
 .tool-versions
+
+# Amp orb portals
+.amp/portals/*
